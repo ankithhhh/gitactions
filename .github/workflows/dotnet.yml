@@ -1,4 +1,4 @@
-name: .NET
+name: .NET CI/CD
 
 on:
   push:
@@ -13,56 +13,61 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v2
 
-    - name: Setup .NET SDK
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: 6.0
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: 6.0
 
-    - name: Restore dependencies
-      run: dotnet restore
+      - name: Restore dependencies
+        run: dotnet restore
 
-    - name: Build project
-      run: dotnet build --no-restore
+      - name: Build project
+        run: dotnet build --no-restore
 
-    - name: Verify selenium-manager exists
-      run: |
-        if [ -f "${{ github.workspace }}/RashmiProject/bin/Debug/net6.0/selenium-manager/linux/selenium-manager" ]; then
-          echo "selenium-manager found!"
-        else
-          echo "selenium-manager NOT found!"
-          exit 1
-        fi
+      - name: Verify selenium-manager exists
+        run: |
+          SELENIUM_PATH=$(find $GITHUB_WORKSPACE -name "selenium-manager" -type f | head -n 1)
+          if [ -f "$SELENIUM_PATH" ]; then
+            echo "selenium-manager found at $SELENIUM_PATH"
+          else
+            echo "selenium-manager NOT found!"
+            exit 1
+          fi
 
-    - name: Give execute permissions to selenium-manager
-      run: chmod +x ${{ github.workspace }}/RashmiProject/bin/Debug/net6.0/selenium-manager/linux/selenium-manager
+      - name: Give execute permissions to selenium-manager
+        run: find $GITHUB_WORKSPACE -name "selenium-manager" -type f -exec chmod +x {} \;
 
-    - name: Run tests with SpecFlow filter
-      run: |
-        dotnet test RashmiProject.sln --filter "FullyQualifiedName~Features.Happyflow" --no-build --verbosity normal
+      - name: Run tests with SpecFlow filter
+        run: |
+          dotnet test RashmiProject.sln --filter "FullyQualifiedName~Features.Happyflow" --no-build --verbosity normal
 
-    - name: List Files in TestResults/ExtentReports
-      run: |
-        echo "Listing files in the ExtentReports directory:"
-        ls -la "${GITHUB_WORKSPACE}/TestResults/ExtentReports"
+      - name: List Files in TestResults/ExtentReports
+        run: |
+          if [ -d "${GITHUB_WORKSPACE}/TestResults/ExtentReports" ]; then
+            echo "Listing files in the ExtentReports directory:"
+            ls -la "${GITHUB_WORKSPACE}/TestResults/ExtentReports"
+          else
+            echo "ExtentReports directory does not exist."
+          fi
 
-    - name: Send email notification
-      if: failure()
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: smtp.gmail.com
-        server_port: 587
-        username: ${{ secrets.GMAIL_USERNAME }}
-        password: ${{ secrets.GMAIL_PASSWORD }}
-        subject: "Test Failed - Screenshot and Extent Report Attached"
-        body: |
-          Hello Developer,
-          One or more tests have failed. Please find the screenshot and extent report attached for your reference.
-          Regards,
-          Your GitHub Actions
-        to: ${{ secrets.DEVELOPER_EMAIL }}
-        from: ${{ secrets.GMAIL_USERNAME }}
-        attachments: |
-          ${{ github.workspace }}/TestResults/ExtentReports/*
+      - name: Send email notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.GMAIL_USERNAME }}
+          password: ${{ secrets.GMAIL_PASSWORD }}
+          subject: "Test Failed - Screenshot and Extent Report Attached"
+          body: |
+            Hello Developer,
+            One or more tests have failed. Please find the screenshot and extent report attached for your reference.
+            Regards,
+            Your GitHub Actions
+          to: ${{ secrets.DEVELOPER_EMAIL }}
+          from: ${{ secrets.GMAIL_USERNAME }}
+          attachments: |
+            ${{ github.workspace }}/TestResults/ExtentReports/*
